@@ -1,13 +1,21 @@
 #include "rlOpenXR.h"
 
-#include "platform/rlOpenXRWin32Wrapper.h"
-#define XR_USE_PLATFORM_WIN32
-#define XR_USE_GRAPHICS_API_OPENGL
-#include "openxr/openxr.h"
-#include "openxr/openxr_platform.h"
-#include "external/glad.h"
+// TODO cleanup includes
+#include "platform/rlOpenXRAndroidWrapper.h"
+// #include "platform/rlOpenXRWin32Wrapper.h"
+// #define XR_USE_PLATFORM_WIN32
+//#define XR_USE_GRAPHICS_API_OPENGL
+//#define XR_USE_PLATFORM_ANDROID
+//#define XR_USE_GRAPHICS_API_OPENGL_ES
+//#define XR_USE_TIMESPEC
+//#include "jni.h"
+//#include "EGL/egl.h"
+//#include "openxr/openxr.h"
+//#include "openxr/openxr_platform.h"
+#include "gfxwrapper_opengl.h"
+//#include "external/glad.h"
 #include "external/cgltf.h"
-#include "raylib.h"
+//#include "raylib.h"
 #include "raymath.h"
 #include "rlgl.h"
 
@@ -91,8 +99,9 @@ constexpr XrReferenceSpaceType c_play_space_type = XR_REFERENCE_SPACE_TYPE_STAGE
 struct RLOpenXRDataExtensions
 {
 	// Required extensions
-	PFN_xrGetOpenGLGraphicsRequirementsKHR xrGetOpenGLGraphicsRequirementsKHR = nullptr;
-	PFN_xrConvertWin32PerformanceCounterToTimeKHR xrConvertWin32PerformanceCounterToTimeKHR = nullptr;
+	PFN_xrGetOpenGLESGraphicsRequirementsKHR xrGetOpenGLESGraphicsRequirementsKHR = nullptr;
+//	PFN_xrConvertWin32PerformanceCounterToTimeKHR xrConvertWin32PerformanceCounterToTimeKHR = nullptr;
+    PFN_xrConvertTimespecTimeToTimeKHR xrConvertTimespecTimeToTimeKHR = nullptr;
 
 	// Optional extensions
 	PFN_xrCreateDebugUtilsMessengerEXT xrCreateDebugUtilsMessengerEXT = nullptr;
@@ -113,7 +122,8 @@ struct RLOpenXRAllData
 	RLOpenXRDataExtensions extensions;
 
 	// TODO: Support more than windows
-	XrGraphicsBindingOpenGLWin32KHR graphics_binding_gl;
+//	XrGraphicsBindingOpenGLWin32KHR graphics_binding_gl;
+    XrGraphicsBindingOpenGLESAndroidKHR graphics_binding_gl;
 
 	XrFrameState frame_state{ XR_TYPE_FRAME_STATE };
 
@@ -129,13 +139,15 @@ struct RLOpenXRAllData
 	std::vector<XrView> views; // array of view_count views, filled by the runtime with current HMD display pose
 
 	XrSwapchain swapchain = XR_NULL_HANDLE;
-	std::vector<XrSwapchainImageOpenGLKHR> swapchain_images;
+	std::vector<XrSwapchainImageOpenGLESKHR> swapchain_images;
 	XrSwapchain depth_swapchain = XR_NULL_HANDLE;
-	std::vector<XrSwapchainImageOpenGLKHR> depth_swapchain_images;
+	std::vector<XrSwapchainImageOpenGLESKHR> depth_swapchain_images;
 
 	unsigned int fbo = 0;
 	RenderTexture mock_hmd_rt{0};
 	unsigned int active_fbo = 0;
+
+    ksGpuWindow window;
 
 	// Construction & Deconstruction
 	RLOpenXRAllData() = default;
@@ -308,6 +320,8 @@ bool rlOpenXRSetup()
 
 	XrResult result = XR_SUCCESS;
 
+
+
 	//print_api_layers();
 
 	// xrEnumerate*() functions are usually called once with CapacityInput = 0.
@@ -332,13 +346,13 @@ bool rlOpenXRSetup()
 	}
 
 	bool opengl_supported = false;
-	std::vector enabled_exts{ XR_KHR_OPENGL_ENABLE_EXTENSION_NAME, XR_EXT_DEBUG_UTILS_EXTENSION_NAME, XR_KHR_WIN32_CONVERT_PERFORMANCE_COUNTER_TIME_EXTENSION_NAME };
+	std::vector enabled_exts{ XR_KHR_OPENGL_ES_ENABLE_EXTENSION_NAME, XR_EXT_DEBUG_UTILS_EXTENSION_NAME, XR_KHR_CONVERT_TIMESPEC_TIME_EXTENSION_NAME/*, XR_KHR_WIN32_CONVERT_PERFORMANCE_COUNTER_TIME_EXTENSION_NAME*/ };
 
 	printf("Runtime supports %d extensions\n", ext_count);
 	for (uint32_t i = 0; i < ext_count; i++) {
 		printf("\t%s v%d\n", ext_props[i].extensionName, ext_props[i].extensionVersion);
 
-		if (strcmp(XR_KHR_OPENGL_ENABLE_EXTENSION_NAME, ext_props[i].extensionName) == 0) {
+		if (strcmp(XR_KHR_OPENGL_ES_ENABLE_EXTENSION_NAME, ext_props[i].extensionName) == 0) {
 			opengl_supported = true;
 		}
 
@@ -354,7 +368,7 @@ bool rlOpenXRSetup()
 
 	if (!opengl_supported) 
 	{
-		printf("Runtime does not support OpenGL extension!\n");
+		printf("Runtime does not support OpenGL ES extension!\n");
 		return false;
 	}
 
@@ -375,21 +389,27 @@ bool rlOpenXRSetup()
 		.enabledExtensionCount = (uint32_t)enabled_exts.size(),
 		.enabledExtensionNames = enabled_exts.data(),
 	};
-	strcpy_s(instance_create_info.applicationInfo.applicationName, "rlOpenXR Application"); // TODO: Do we want this to be exposed? Does it have any purpose?
-	strcpy_s(instance_create_info.applicationInfo.engineName, "Raylib (rlOpenXR)");
+//	strcpy_s(instance_create_info.applicationInfo.applicationName, "rlOpenXR Application"); // TODO: Do we want this to be exposed? Does it have any purpose?
+//	strcpy_s(instance_create_info.applicationInfo.engineName, "Raylib (rlOpenXR)");
+	strncpy(instance_create_info.applicationInfo.applicationName, "rlOpenXR Application", XR_MAX_APPLICATION_NAME_SIZE); // TODO: Do we want this to be exposed? Does it have any purpose?
+	strncpy(instance_create_info.applicationInfo.engineName, "Squeak / Raylib (rlOpenXR)", XR_MAX_ENGINE_NAME_SIZE);
 
 	result = xrCreateInstance(&instance_create_info, &s_xr->data.instance);
 	if (!xr_check(result, "Failed to create XR instance."))
 		return false;
 
-	result = xrGetInstanceProcAddr(s_xr->data.instance, "xrGetOpenGLGraphicsRequirementsKHR",
-			(PFN_xrVoidFunction*)&s_xr->extensions.xrGetOpenGLGraphicsRequirementsKHR);
+	result = xrGetInstanceProcAddr(s_xr->data.instance, "xrGetOpenGLESGraphicsRequirementsKHR",
+			(PFN_xrVoidFunction*)&s_xr->extensions.xrGetOpenGLESGraphicsRequirementsKHR);
 	if (!xr_check(result, "Failed to get OpenGL graphics requirements function!"))
 		return false;
 
-	result = xrGetInstanceProcAddr(s_xr->data.instance, "xrConvertWin32PerformanceCounterToTimeKHR",
-		(PFN_xrVoidFunction*)&s_xr->extensions.xrConvertWin32PerformanceCounterToTimeKHR);
-	if (!xr_check(result, "Failed to get xrConvertWin32PerformanceCounterToTimeKHR function!"))
+//	result = xrGetInstanceProcAddr(s_xr->data.instance, "xrConvertWin32PerformanceCounterToTimeKHR",
+//		(PFN_xrVoidFunction*)&s_xr->extensions.xrConvertWin32PerformanceCounterToTimeKHR);
+//	if (!xr_check(result, "Failed to get xrConvertWin32PerformanceCounterToTimeKHR function!"))
+//		return false;
+	result = xrGetInstanceProcAddr(s_xr->data.instance, "xrConvertTimespecTimeToTimeKHR",
+		(PFN_xrVoidFunction*)&s_xr->extensions.xrConvertTimespecTimeToTimeKHR);
+	if (!xr_check(result, "Failed to get xrConvertTimespecTimeToTimeKHR function!"))
 		return false;
 
 	result = xrGetInstanceProcAddr(s_xr->data.instance, "xrCreateDebugUtilsMessengerEXT",
@@ -454,11 +474,11 @@ bool rlOpenXRSetup()
 
 	// this function pointer was loaded with xrGetInstanceProcAddr
 	// OpenXR requires checking graphics requirements before creating a session.
-	XrGraphicsRequirementsOpenGLKHR opengl_reqs = { .type = XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR,
+	XrGraphicsRequirementsOpenGLESKHR opengl_reqs = { .type = XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_ES_KHR,
 												   .next = NULL };
 
 
-	result = s_xr->extensions.xrGetOpenGLGraphicsRequirementsKHR(s_xr->data.instance, s_xr->data.system_id, &opengl_reqs);
+	result = s_xr->extensions.xrGetOpenGLESGraphicsRequirementsKHR(s_xr->data.instance, s_xr->data.system_id, &opengl_reqs);
 	if (!xr_check(result, "Failed to get OpenGL graphics requirements!"))
 		return false;
 
@@ -480,26 +500,33 @@ bool rlOpenXRSetup()
 		major, minor
 		);
 
+//#warning TODO android session
+
+//    wrapped_initializeKsGpuWindow(&s_xr->window);
+
 	// --- Create session
 	// Assume the calling thread is the one initialised by raylib
-	auto graphics_binding_gl = XrGraphicsBindingOpenGLWin32KHR{
-		.type = XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR,
-		.next = nullptr,
-		.hDC = wrapped_wglGetCurrentDC(),
-		.hGLRC = wrapped_wglGetCurrentContext()
-	};
+//	auto graphics_binding_gl = XrGraphicsBindingOpenGLESAndroidKHR {
+//		.type = XR_TYPE_GRAPHICS_BINDING_OPENGL_ES_ANDROID_KHR,
+//		.next = nullptr,
+//		.display = s_xr->window.display,
+//        .config = s_xr->window.context.config,
+//        .context =s_xr->window.context.context,
+//	};
+    wrapped_populateGraphicsBinding(static_cast<void*>(&s_xr->graphics_binding_gl));
 
-	assert(graphics_binding_gl.hDC != NULL);
-	assert(graphics_binding_gl.hGLRC != NULL);
+	assert(s_xr->graphics_binding_gl.display != NULL);
+	assert(s_xr->graphics_binding_gl.config != NULL);
+	assert(s_xr->graphics_binding_gl.context != NULL);
 
 	XrSessionCreateInfo session_create_info = {
-		.type = XR_TYPE_SESSION_CREATE_INFO, .next = &graphics_binding_gl, .systemId = s_xr->data.system_id };
+		.type = XR_TYPE_SESSION_CREATE_INFO, .next = &s_xr->graphics_binding_gl, .systemId = s_xr->data.system_id };
 
 	result = xrCreateSession(s_xr->data.instance, &session_create_info, &s_xr->data.session);
 	if (!xr_check(result, "Failed to create session"))
 		return 1;
 
-	printf("Successfully created a session with OpenGL!\n");
+	printf("Successfully created a session with OpenGL ES!\n");
 
 	/* Many runtimes support at least STAGE and LOCAL but not all do.
 	 * Sophisticated apps might check with xrEnumerateReferenceSpaces() if the
@@ -546,8 +573,9 @@ bool rlOpenXRSetup()
 		// TODO: assert recommendedSwapchainSampleCounts & recommendedImageRectHeights are the same for each view
 	}
 
-	s_xr->fbo = rlLoadFramebuffer(swapchain_width, s_xr->viewconfig_views[0].recommendedImageRectHeight);
-	
+//	s_xr->fbo = rlLoadFramebuffer(swapchain_width, s_xr->viewconfig_views[0].recommendedImageRectHeight);
+	s_xr->fbo = rlLoadFramebuffer();
+
 	// TODO: Better way to choose swapchain format than hardcoding it
 	const int color_gl_internal_format = GL_SRGB8_ALPHA8;
 	const auto color_format_name = "GL_SRGB8_ALPHA8";
@@ -599,10 +627,10 @@ bool rlOpenXRSetup()
 		if (!xr_check(result, "Failed to enumerate swapchains"))
 			return false;
 
-		s_xr->swapchain_images.resize(swapchain_image_count, { .type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR, .next = nullptr });
+		s_xr->swapchain_images.resize(swapchain_image_count, { .type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_ES_KHR, .next = nullptr });
 		result = xrEnumerateSwapchainImages(s_xr->swapchain, swapchain_image_count, &swapchain_image_count,
 				(XrSwapchainImageBaseHeader*)s_xr->swapchain_images.data());
-		if (!xr_check(result, "Failed to enumerate swapchain images"))
+		if (!xr_check(result, "Failed to enumerate swapchain images (main)"))
 			return false;
 
 		printf("Succesfully created OpenXR color swapchain with format: %s. Dimensions: %d, %d\n", 
@@ -641,11 +669,11 @@ bool rlOpenXRSetup()
 
 			uint32_t depth_swapchain_image_count;
 			result = xrEnumerateSwapchainImages(s_xr->depth_swapchain, 0, &depth_swapchain_image_count, NULL);
-			if (!xr_check(result, "Failed to enumerate swapchains"))
+			if (!xr_check(result, "Failed to enumerate swapchains (depth)"))
 				return false;
 
 			// these are wrappers for the actual OpenGL texture id
-			s_xr->depth_swapchain_images.resize(depth_swapchain_image_count, {.type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR, .next = nullptr});
+			s_xr->depth_swapchain_images.resize(depth_swapchain_image_count, {.type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_ES_KHR, .next = nullptr});
 			result = xrEnumerateSwapchainImages(s_xr->depth_swapchain, depth_swapchain_image_count, &depth_swapchain_image_count,
 				(XrSwapchainImageBaseHeader*)s_xr->depth_swapchain_images.data());
 			if (!xr_check(result, "Failed to enumerate swapchain images"))
@@ -717,6 +745,7 @@ void rlOpenXRShutdown()
 
 	rlUnloadFramebuffer(s_xr->fbo);
 	UnloadRenderTexture(s_xr->mock_hmd_rt);
+    wrapped_destroyKsGpuWindow(&s_xr->window);
 
 	XrResult result = xrDestroyInstance(s_xr->data.instance);
 	if (XR_SUCCEEDED(result))
@@ -1044,38 +1073,39 @@ bool rlOpenXRBegin()
 
 bool rlOpenXRBeginMockHMD()
 {
-	assert(s_xr && "rlOpenXR is not initialised yet, call rlOpenXRSetup()");
-
-	VrDeviceInfo mock_device = {
-		// Oculus Rift CV1 parameters for simulator
-		.hResolution = 2160,                 // Horizontal resolution in pixels
-		.vResolution = 1200,                 // Vertical resolution in pixels
-		.hScreenSize = 0.133793f,            // Horizontal size in meters
-		.vScreenSize = 0.0669f,              // Vertical size in meters
-		.vScreenCenter = 0.04678f,           // Screen center in meters
-		.eyeToScreenDistance = 0.041f,       // Distance between eye and display in meters
-		.lensSeparationDistance = 0.07f,     // Lens separation distance in meters
-		.interpupillaryDistance = 0.07f,     // IPD (distance between pupils) in meters
-
-		// NOTE: CV1 uses fresnel-hybrid-asymmetric lenses with specific compute shaders
-		// Following parameters are just an approximation to CV1 distortion stereo rendering
-		.lensDistortionValues = { 1.0f, 0.22f, 0.24f, 0.0f},
-		.chromaAbCorrection = { 0.996f,	-0.004f, 1.014f, 0.0f }
-	};
-
-	static const VrStereoConfig config = LoadVrStereoConfig(mock_device);
-
-	if (s_xr->mock_hmd_rt.id == 0)
-	{
-		s_xr->mock_hmd_rt = LoadRenderTexture(mock_device.hResolution, mock_device.vResolution);
-	}
-
-	BeginTextureMode(s_xr->mock_hmd_rt);
-	s_xr->active_fbo = s_xr->mock_hmd_rt.id;
-
-	BeginVrStereoMode(config);
-
-	return true;
+    assert(false && "NYI");
+//	assert(s_xr && "rlOpenXR is not initialised yet, call rlOpenXRSetup()");
+//
+//	VrDeviceInfo mock_device = {
+//		// Oculus Rift CV1 parameters for simulator
+//		.hResolution = 2160,                 // Horizontal resolution in pixels
+//		.vResolution = 1200,                 // Vertical resolution in pixels
+//		.hScreenSize = 0.133793f,            // Horizontal size in meters
+//		.vScreenSize = 0.0669f,              // Vertical size in meters
+//		.vScreenCenter = 0.04678f,           // Screen center in meters
+//		.eyeToScreenDistance = 0.041f,       // Distance between eye and display in meters
+//		.lensSeparationDistance = 0.07f,     // Lens separation distance in meters
+//		.interpupillaryDistance = 0.07f,     // IPD (distance between pupils) in meters
+//
+//		// NOTE: CV1 uses fresnel-hybrid-asymmetric lenses with specific compute shaders
+//		// Following parameters are just an approximation to CV1 distortion stereo rendering
+//		.lensDistortionValues = { 1.0f, 0.22f, 0.24f, 0.0f},
+//		.chromaAbCorrection = { 0.996f,	-0.004f, 1.014f, 0.0f }
+//	};
+//
+//	static const VrStereoConfig config = LoadVrStereoConfig(mock_device);
+//
+//	if (s_xr->mock_hmd_rt.id == 0)
+//	{
+//		s_xr->mock_hmd_rt = LoadRenderTexture(mock_device.hResolution, mock_device.vResolution);
+//	}
+//
+//	BeginTextureMode(s_xr->mock_hmd_rt);
+//	s_xr->active_fbo = s_xr->mock_hmd_rt.id;
+//
+//	BeginVrStereoMode(config);
+//
+//	return true;
 }
 
 void rlOpenXREnd()
@@ -1168,10 +1198,15 @@ void rlOpenXRBlitToWindow(RLOpenXREye eye, bool keep_aspect_ratio)
 
 	ClearBackground(BLACK);
 
-	glBlitNamedFramebuffer(s_xr->active_fbo, 0,
-		src.offset.x, src.offset.y, src.offset.x + src.extent.width, src.offset.y + src.extent.height,
-		dest.offset.x, dest.offset.y, dest.offset.x + dest.extent.width, dest.offset.y + dest.extent.height,
-		GL_COLOR_BUFFER_BIT, GL_LINEAR);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, s_xr->active_fbo);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    glBlitFramebuffer(src.offset.x, src.offset.y, src.offset.x + src.extent.width, src.offset.y + src.extent.height,
+                           dest.offset.x, dest.offset.y, dest.offset.x + dest.extent.width, dest.offset.y + dest.extent.height,
+                           GL_COLOR_BUFFER_BIT, GL_LINEAR);
+//	glBlitNamedFramebuffer(s_xr->active_fbo, 0,
+//		src.offset.x, src.offset.y, src.offset.x + src.extent.width, src.offset.y + src.extent.height,
+//		dest.offset.x, dest.offset.y, dest.offset.x + dest.extent.width, dest.offset.y + dest.extent.height,
+//		GL_COLOR_BUFFER_BIT, GL_LINEAR);
 
 	rlEnableFramebuffer(s_xr->active_fbo);
 }
@@ -1264,8 +1299,10 @@ const RLOpenXRData* rlOpenXRData()
 
 XrTime rlOpenXRGetTime()
 {
-	const XrTime current_time = wrapped_XrTimeFromQueryPerformanceCounter(s_xr->data.instance, 
-		s_xr->extensions.xrConvertWin32PerformanceCounterToTimeKHR);
+    const XrTime current_time = wrapped_XrTimeFromQueryPerformanceCounter(s_xr->data.instance,
+                                                                          (void*)s_xr->extensions.xrConvertTimespecTimeToTimeKHR);
+//	const XrTime current_time = wrapped_XrTimeFromQueryPerformanceCounter(s_xr->data.instance,
+//		s_xr->extensions.xrConvertWin32PerformanceCounterToTimeKHR);
 	const XrTime predicted_time = s_xr->frame_state.predictedDisplayTime;
 	
 	return std::max(current_time, predicted_time);
