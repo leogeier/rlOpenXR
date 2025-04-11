@@ -57,7 +57,7 @@ FetchContent_MakeAvailable(openxr)
 find_package(EGL)
 
 # Executable
-add_library (rlOpenXR "include/rlOpenXR.h" "src/rlOpenXR.cpp" "include/platform/rlOpenXRAndroidWrapper.h" "src/platform/rlOpenXRAndroidWrapper.cpp" )
+add_library (rlOpenXR OBJECT "include/rlOpenXR.h" "src/rlOpenXR.cpp" "include/platform/rlOpenXRAndroidWrapper.h" "src/platform/rlOpenXRAndroidWrapper.cpp" )
 target_link_libraries(rlOpenXR PUBLIC raylib openxr_loader android)
 target_include_directories(rlOpenXR PUBLIC include ${EGL_INCLUDE_DIRS})
 target_compile_features(rlOpenXR PRIVATE cxx_std_20) # TODO: Aim for 17 in the future
