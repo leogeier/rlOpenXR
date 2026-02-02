@@ -1308,6 +1308,18 @@ XrTime rlOpenXRGetTime()
 	return std::max(current_time, predicted_time);
 }
 
+XrInstance rlGetXRInstance() {
+  return s_xr->data.instance;
+}
+
+XrSession rlGetXRSession() {
+  return s_xr->data.session;
+}
+
+XrSpace rlGetPlaySpace() {
+  return s_xr->data.play_space;
+}
+
 #ifdef __cplusplus
 }
 #endif

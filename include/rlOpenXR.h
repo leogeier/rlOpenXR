@@ -87,6 +87,12 @@ void rlOpenXRSyncSingleActionSet(XrActionSet action_set); // Utility function fo
 // Misc
 XrTime rlOpenXRGetTime();
 
+XrInstance rlGetXRInstance();
+
+XrSession rlGetXRSession();
+
+XrSpace rlGetPlaySpace();
+
 #ifdef __cplusplus
 }
 #endif
