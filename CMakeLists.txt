@@ -53,25 +53,35 @@ FetchContent_Declare(
 # MakeAvailable_WithFindPackageCheck(openxr openxr_loader)
 FetchContent_MakeAvailable(openxr)
 
-# find_package(OpenGL COMPONENTS EGL)
-find_package(EGL)
-
 # Executable
-add_library (rlOpenXR OBJECT "include/rlOpenXR.h" "src/rlOpenXR.cpp" "include/platform/rlOpenXRAndroidWrapper.h" "src/platform/rlOpenXRAndroidWrapper.cpp" )
-target_link_libraries(rlOpenXR PUBLIC raylib openxr_loader android)
-target_include_directories(rlOpenXR PUBLIC include ${EGL_INCLUDE_DIRS})
+if(ANDROID OR ENABLE_ANDROID)
+  # find_package(OpenGL COMPONENTS EGL)
+  find_package(EGL REQUIRED)
+
+  add_library (rlOpenXR OBJECT "include/rlOpenXR.h" "src/rlOpenXR.cpp" "include/platform/rlOpenXRAndroidWrapper.h" "src/platform/rlOpenXRAndroidWrapper.cpp" )
+  target_link_libraries(rlOpenXR PUBLIC raylib openxr_loader android)
+  target_include_directories(rlOpenXR PUBLIC include ${EGL_INCLUDE_DIRS})
+else()
+  add_library (rlOpenXR OBJECT "include/rlOpenXR.h" "src/rlOpenXR.cpp" "include/platform/rlOpenXRWin32Wrapper.h" "src/platform/rlOpenXRWin32Wrapper.cpp" )
+  target_link_libraries(rlOpenXR PUBLIC raylib openxr_loader)
+  target_include_directories(rlOpenXR PUBLIC include)
+endif()
+
 target_compile_features(rlOpenXR PRIVATE cxx_std_20) # TODO: Aim for 17 in the future
 target_compile_definitions(rlOpenXR PRIVATE NOMINMAX)
 
-include(cmake/gfxwrapper.cmake)
-if(TARGET openxr-gfxwrapper)
-  target_include_directories(
-    rlOpenXR PUBLIC ${openxr_SOURCE_DIR}/src/common
-  )
-  target_link_libraries(rlOpenXR PUBLIC openxr-gfxwrapper)
-  target_compile_definitions(
-    rlOpenXR PUBLIC XR_TUTORIAL_USE_OPENGL_ES
-  )
+# gfxwrapper (from the OpenXR SDK) is only needed for the OpenGL ES / Android path
+if(ANDROID OR ENABLE_ANDROID)
+  include(cmake/gfxwrapper.cmake)
+  if(TARGET openxr-gfxwrapper)
+    target_include_directories(
+      rlOpenXR PUBLIC ${openxr_SOURCE_DIR}/src/common
+    )
+    target_link_libraries(rlOpenXR PUBLIC openxr-gfxwrapper)
+    target_compile_definitions(
+      rlOpenXR PUBLIC XR_TUTORIAL_USE_OPENGL_ES
+    )
+  endif()
 endif()
 
 

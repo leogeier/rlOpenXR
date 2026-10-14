@@ -23,6 +23,10 @@ HGLRC wrapped_wglGetCurrentContext();
 BOOL wrapped_wglMakeCurrent(HDC hDC, HGLRC hGLRC);
 XrTime wrapped_XrTimeFromQueryPerformanceCounter(XrInstance instance, void* xrConvertWin32PerformanceCounterToTimeKHR_funcptr);
 
+// Fills an XrGraphicsBindingOpenGLWin32KHR (passed as void* so that this header
+// stays free of openxr_platform.h / windows.h).
+void wrapped_populateGraphicsBinding(void* binding);
+
 #ifdef __cplusplus
 }
 #endif

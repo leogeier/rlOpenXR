@@ -1,12 +1,24 @@
 #pragma once
 #include "raylib.h"
+
+// On Android we expose the platform/graphics specific OpenXR types, since the
+// headers involved (jni.h / EGL) do not collide with anything raylib uses.
+// On Win32 we must NOT define XR_USE_PLATFORM_WIN32 here, because
+// openxr_platform.h then needs <windows.h>, which collides with raylib.h.
+// The Win32 specific parts are isolated in platform/rlOpenXRWin32Wrapper.*
+#if defined(__ANDROID__)
 #define XR_USE_PLATFORM_ANDROID
 #define XR_USE_GRAPHICS_API_OPENGL_ES
 #define XR_USE_TIMESPEC
 #include <jni.h>
 #include "EGL/egl.h"
+#endif
+
 #include "openxr/openxr.h"
+
+#if defined(__ANDROID__)
 #include "openxr/openxr_platform.h"
+#endif
 
 // TODO: DLL export stuff
 
