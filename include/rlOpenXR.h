@@ -93,6 +93,8 @@ XrSession rlGetXRSession();
 
 XrSpace rlGetPlaySpace();
 
+XrSystemId rlGetSystemId();
+
 #ifdef __cplusplus
 }
 #endif

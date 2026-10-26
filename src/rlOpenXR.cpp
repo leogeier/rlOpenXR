@@ -361,9 +361,24 @@ bool rlOpenXRSetup()
 			enabled_exts.push_back(XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME);
 		}
 
-		if (strcmp(XR_MSFT_CONTROLLER_MODEL_EXTENSION_NAME, ext_props[i].extensionName) == 0) {
-			enabled_exts.push_back(XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME);
-		}
+//		if (strcmp(XR_MSFT_CONTROLLER_MODEL_EXTENSION_NAME, ext_props[i].extensionName) == 0) {
+//			enabled_exts.push_back(XR_MSFT_CONTROLLER_MODEL_EXTENSION_NAME);
+//		}
+
+    #define XR_META_DYNAMIC_OBJECT_TRACKER_EXTENSION_NAME "XR_META_dynamic_object_tracker"
+    if (strcmp(XR_META_DYNAMIC_OBJECT_TRACKER_EXTENSION_NAME, ext_props[i].extensionName) == 0) {
+        enabled_exts.push_back(XR_META_DYNAMIC_OBJECT_TRACKER_EXTENSION_NAME);
+    }
+
+    #define XR_META_DYNAMIC_OBJECT_KEYBOARD_EXTENSION_NAME "XR_META_dynamic_object_keyboard"
+    if (strcmp(XR_META_DYNAMIC_OBJECT_KEYBOARD_EXTENSION_NAME, ext_props[i].extensionName) == 0) {
+        enabled_exts.push_back(XR_META_DYNAMIC_OBJECT_KEYBOARD_EXTENSION_NAME);
+    }
+
+    #define XR_EXT_HAND_TRACKING_NAME "XR_EXT_hand_tracking"
+    if (strcmp(XR_EXT_HAND_TRACKING_NAME, ext_props[i].extensionName) == 0) {
+      enabled_exts.push_back(XR_EXT_HAND_TRACKING_NAME);
+    }
 	}
 
 	if (!opengl_supported) 
@@ -1318,6 +1333,10 @@ XrSession rlGetXRSession() {
 
 XrSpace rlGetPlaySpace() {
   return s_xr->data.play_space;
+}
+
+XrSystemId rlGetSystemId() {
+  return s_xr->data.system_id;
 }
 
 #ifdef __cplusplus
