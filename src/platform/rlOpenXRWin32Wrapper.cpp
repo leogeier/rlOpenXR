@@ -1,9 +1,11 @@
 #include "platform/rlOpenXRWin32Wrapper.h"
 
+#include <windows.h>
+
 #define XR_USE_PLATFORM_WIN32
+#define XR_USE_GRAPHICS_API_OPENGL
 #include "openxr/openxr.h"
 #include "openxr/openxr_platform.h"
-#include <windows.h>
 
 #include <cassert>
 
@@ -40,6 +42,16 @@ XrTime wrapped_XrTimeFromQueryPerformanceCounter(XrInstance instance, void* xrCo
 	assert(XR_SUCCEEDED(result_xr));
 
 	return time_xr;
+}
+
+void wrapped_populateGraphicsBinding(void* binding_ptr)
+{
+	auto& binding = *static_cast<XrGraphicsBindingOpenGLWin32KHR*>(binding_ptr);
+
+	binding.type = XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR;
+	binding.next = nullptr;
+	binding.hDC = wglGetCurrentDC();
+	binding.hGLRC = wglGetCurrentContext();
 }
 
 #ifdef __cplusplus
